@@ -81,18 +81,18 @@ Layer::~Layer()
     // std::cout << "Destorying Layer with input=" << inputs << " and output=" << outputs << std::endl;
 
     // TODO: This is buggy! Fix this later when have time
-   // if (data_h != NULL) {
-   //     delete [] data_h;
-   // }
-   // if (data_d != NULL) {
-   //     checkCudaErrors( cudaFree(data_d) );
-   // }
-   // if (bias_h != NULL) {
-   //     delete [] bias_h;
-   // }
-   // if (bias_d != NULL) {
-   //     checkCudaErrors( cudaFree(bias_d) );
-   // }
+    if (data_h != NULL) {
+        delete [] data_h;
+    }
+    if (data_d != NULL) {
+        checkCudaErrors( cudaFree(data_d) );
+    }
+    if (bias_h != NULL) {
+        delete [] bias_h;
+    }
+    if (bias_d != NULL) {
+        checkCudaErrors( cudaFree(bias_d) );
+    }
 }
 
 Network::Network()
@@ -230,6 +230,7 @@ ConvAlgo Network::getConvAlgo(const Layer& conv, const ConvDimen &in, const Conv
                                             &result.algo
                                             ) );
     */
+    
     /*
     checkCUDNN( cudnnGetConvolutionForwardAlgorithm(mCudnnHandle,
                                             mSrcTensorDesc,
@@ -237,7 +238,7 @@ ConvAlgo Network::getConvAlgo(const Layer& conv, const ConvDimen &in, const Conv
                                             mConvDesc,
                                             mDstTensorDesc,
                                             CUDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT,
-                                            500000000,
+                                            250000000,
                                             &result.algo
                                             ) );
     */

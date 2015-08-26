@@ -33,14 +33,14 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
      // --- Initializing Layer ---
     int data_size = img_filter_c * filter_k * filter_dim * filter_dim;
     int data_size_b = data_size * sizeof(value_type);
-    value_type data_h[data_size];
+    value_type *data_h = new value_type[data_size];
     value_type *data_d;
     checkCudaErrors(cudaMalloc(&data_d, data_size_b));
     checkCudaErrors(cudaMemcpy(data_d, data_h, data_size_b, cudaMemcpyHostToDevice));
  
     int bias_size = filter_k;
     int bias_size_b = bias_size * sizeof(value_type);
-    value_type bias_h[bias_size];
+    value_type *bias_h = new value_type[bias_size];
     value_type *bias_d;
     checkCudaErrors(cudaMalloc(&bias_d, bias_size_b));
     checkCudaErrors(cudaMemcpy(bias_d, bias_h, bias_size_b, cudaMemcpyHostToDevice));
@@ -50,14 +50,12 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
     // --- Initializing image ---
     int img_size = img_w * img_h * img_n * img_filter_c;
     int img_size_b = img_size * sizeof(value_type);
-    value_type *img_data_h = (value_type*) malloc(img_size_b);
+    value_type *img_data_h = new value_type[img_size_b];
     value_type *img_data_d;
     checkCudaErrors(cudaMalloc(&img_data_d, img_size_b));
-    checkCudaErrors(cudaMemcpy(img_data_d, img_data_h, img_size_b, cudaMemcpyHostToDevice));
-
 
     Network network;
-    const int NUM_ITER = 100;
+    const int NUM_ITER = 30;
 
 
     std::stringstream ss;
@@ -87,6 +85,7 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
     checkCudaErrors(cudaMalloc(&workspace, convAlgo.workspaceSize_b));
 
     for (int i = 0 ; i < NUM_ITER ; i++) {
+        checkCudaErrors(cudaMemcpy(img_data_d, img_data_h, img_size_b, cudaMemcpyHostToDevice));
         timeTaken = getCurrentTime();
         network.convoluteForward(layer, inDimen, outDimen, img_data_d, dstData, convAlgo, workspace);
         deltaTime = getCurrentTime() - timeTaken;
@@ -95,12 +94,12 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
     }
     checkCudaErrors(cudaFree(dstData));
     checkCudaErrors(cudaFree(workspace));
+    checkCudaErrors(cudaFree(img_data_d));
 
     ss.str("");
     ss << "algo=" << ((int) convAlgo.algo) << " dstDataSize_b=" <<
             dstDataSize_b << " workspaceSize_b=" << workspaceSize_b << std::endl;
-    std::cout << ss.str();
-
+    //std::cout << ss.str();
 
     ss.str("");
     ss << "Avg time for each=" << (totalTime / NUM_ITER) << "us." << std::endl << std::endl;
@@ -112,10 +111,13 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
 
 void executeBenchmark() {
     int img_ws[] = 
-        { 240, 480, 960 };//, 960, 1920, 3840 };
+        { 240, 480 };//, 960 };//, 960, 1920, 3840 };
     int img_hs[] =
-        { 135, 270, 540 };//, 540, 1080, 2160 };
+        { 135, 270 };//, 540 };//, 540, 1080, 2160 };
     int img_dims_size = sizeof(img_ws) / sizeof(int);
+
+    int img_n[] = { 4 };
+    int img_n_size = sizeof(img_n) / sizeof(int);
 
     int img_filter_cs[] =
         { 1, 32, 64 };
@@ -130,7 +132,7 @@ void executeBenchmark() {
     int filter_dims_size = sizeof(filter_dims) / sizeof(int);
 
     std::stringstream ss;
-    ss << "w, h, c, k, filter_dim, avg_time(us), max_time(us)" << std::endl;
+    ss << "n, w, h, c, k, filter_dim, avg_time(us), max_time(us)" << std::endl;
     std::cout << ss.str();
 
     long total = 0;
@@ -143,12 +145,15 @@ void executeBenchmark() {
                 int k = filter_ks[idx_k];
                 for (int idx_fdims = 0 ; idx_fdims < filter_dims_size ; idx_fdims++) {
                     int fdim = filter_dims[idx_fdims];
-                    ss.str("");
-                    BenchTime benchTime = benchmark(w, h, 1, c, k, fdim);
-                    total += benchTime.avgTime;
-                    ss << w << ", " << h << ", " << c << ", " << k << ", " << 
-                            fdim << ", " << benchTime.avgTime << ", " << benchTime.maxTime << std::endl;
-                    std::cout << ss.str();
+                    for (int idx_n = 0 ; idx_n < img_n_size ; idx_n++) {
+                        int n = img_n[idx_n];
+                        ss.str("");
+                        BenchTime benchTime = benchmark(w, h, n, c, k, fdim);
+                        total += benchTime.avgTime;
+                        ss << n << ", " << w << ", " << h << ", " << c << ", " << k << ", " << 
+                                fdim << ", " << benchTime.avgTime << ", " << benchTime.maxTime << std::endl;
+                        std::cout << ss.str();
+                    }
                 }
            }
         }
