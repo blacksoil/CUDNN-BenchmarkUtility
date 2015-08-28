@@ -49,4 +49,9 @@ struct BenchTime {
     long maxTime;
 };
 
+struct CNNResult {
+    int h;
+    int w;
+    value_type* result;
+};
 #endif

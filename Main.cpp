@@ -33,141 +33,168 @@ long getCurrentTime() {
     return ret;
 }
 
-// return the time takes to run the operations
-BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filter_k, int filter_dim) {
-     // --- Initializing Layer ---
-    int data_size = img_filter_c * filter_k * filter_dim * filter_dim;
-    int data_size_b = data_size * sizeof(value_type);
-    value_type *data_h = new value_type[data_size];
-    value_type *data_d;
-    checkCudaErrors(cudaMalloc(&data_d, data_size_b));
-    checkCudaErrors(cudaMemcpy(data_d, data_h, data_size_b, cudaMemcpyHostToDevice));
- 
-    int bias_size = filter_k;
-    int bias_size_b = bias_size * sizeof(value_type);
-    value_type *bias_h = new value_type[bias_size];
-    value_type *bias_d;
-    checkCudaErrors(cudaMalloc(&bias_d, bias_size_b));
-    checkCudaErrors(cudaMemcpy(bias_d, bias_h, bias_size_b, cudaMemcpyHostToDevice));
- 
-    Layer layer = Layer(img_filter_c, filter_k, filter_dim, data_h, data_d, bias_h, bias_d);
- 
-    // --- Initializing image ---
-    int img_size = img_w * img_h * img_n * img_filter_c;
-    int img_size_b = img_size * sizeof(value_type);
-    value_type *img_data_h = new value_type[img_size_b];
-    value_type *img_data_d;
-    checkCudaErrors(cudaMalloc(&img_data_d, img_size_b));
 
-    Network network;
-    const int NUM_ITER = 30;
+void debug();
+void debug() {
+    std::cout << "debug()" << std::endl;
 
+    // ------ Begin kernel initialization --------------
+    // num of output feature map
+    int filter_k = 2;
+    // num of input feature map
+    int filter_c = 2;
+    int filter_dim = 3;
+    int filter_size = filter_c * filter_k * filter_dim * filter_dim;
+    value_type data_h[filter_size];
 
     std::stringstream ss;
-    ss << "Running #" << NUM_ITER << " convoluteForward:" << 
-            "w=" << img_w << " h=" << img_h << " c=" << img_filter_c << " k=" << filter_k <<
-            " filter_dim=" << filter_dim << std::endl;
-    // std::cout << ss.str();
-    // TODO: warm-up?
-    long timeTaken;
-    long deltaTime;
-    long maxTime = 0;
-    long totalTime = 0;
-    int dstDataSize_b;
-    int workspaceSize_b;
-
-    ConvDimen inDimen = { img_n, img_filter_c, img_h, img_w };
-    ConvDimen outDimen = network.getConvDimension(layer, inDimen);
-    ConvAlgo convAlgo = network.getConvAlgo(layer, inDimen, outDimen);
-
-    dstDataSize_b = outDimen.n * outDimen.c *
-            outDimen.h * outDimen.w * sizeof(value_type);
-    workspaceSize_b = convAlgo.workspaceSize_b;
-
-    value_type *dstData = NULL;
-    value_type *workspace = NULL;
-    checkCudaErrors(cudaMalloc(&dstData, dstDataSize_b));
-    checkCudaErrors(cudaMalloc(&workspace, convAlgo.workspaceSize_b));
-
-    for (int i = 0 ; i < NUM_ITER ; i++) {
-        checkCudaErrors(cudaMemcpy(img_data_d, img_data_h, img_size_b, cudaMemcpyHostToDevice));
-        timeTaken = getCurrentTime();
-        network.convoluteForward(layer, inDimen, outDimen, img_data_d, dstData, convAlgo, workspace);
-        deltaTime = getCurrentTime() - timeTaken;
-        totalTime += deltaTime;
-        maxTime = std::max(maxTime, deltaTime);
-    }
-    checkCudaErrors(cudaFree(dstData));
-    checkCudaErrors(cudaFree(workspace));
-    checkCudaErrors(cudaFree(img_data_d));
-
-    ss.str("");
-    ss << "algo=" << ((int) convAlgo.algo) << " dstDataSize_b=" <<
-            dstDataSize_b << " workspaceSize_b=" << workspaceSize_b << std::endl;
-    //std::cout << ss.str();
-
-    ss.str("");
-    ss << "Avg time for each=" << (totalTime / NUM_ITER) << "us." << std::endl << std::endl;
-    //std::cout << ss.str();        
-    BenchTime result = { (totalTime / NUM_ITER), maxTime };
-
-    return result;
-}
-
-void executeBenchmark() {
-    int img_ws[] = 
-        { 240, 480 };//, 960 };//, 960, 1920, 3840 };
-    int img_hs[] =
-        { 135, 270 };//, 540 };//, 540, 1080, 2160 };
-    int img_dims_size = sizeof(img_ws) / sizeof(int);
-
-    int img_n[] = { 4 };
-    int img_n_size = sizeof(img_n) / sizeof(int);
-
-    int img_filter_cs[] =
-        { 1, 32, 64 };
-    int img_filter_cs_size = sizeof(img_filter_cs) / sizeof(int);
-
-    int filter_ks[] =
-        { 1, 32, 64 };
-    int filter_ks_size = sizeof(filter_ks) / sizeof(int);
-
-    int filter_dims[] =
-        { 5, 9};
-    int filter_dims_size = sizeof(filter_dims) / sizeof(int);
-
-    std::stringstream ss;
-    ss << "n, w, h, c, k, filter_dim, avg_time(us), max_time(us)" << std::endl;
-    std::cout << ss.str();
-
-    long total = 0;
-    for (int idx_dim = 0; idx_dim < img_dims_size ; idx_dim++) {
-        int w = img_ws[idx_dim];
-        int h = img_hs[idx_dim];
-        for (int idx_c = 0 ; idx_c < img_filter_cs_size ; idx_c++) {
-           int c = img_filter_cs[idx_c];
-           for (int idx_k = 0 ; idx_k < filter_ks_size ; idx_k++) {
-                int k = filter_ks[idx_k];
-                for (int idx_fdims = 0 ; idx_fdims < filter_dims_size ; idx_fdims++) {
-                    int fdim = filter_dims[idx_fdims];
-                    for (int idx_n = 0 ; idx_n < img_n_size ; idx_n++) {
-                        int n = img_n[idx_n];
-                        ss.str("");
-                        BenchTime benchTime = benchmark(w, h, n, c, k, fdim);
-                        total += benchTime.avgTime;
-                        ss << n << ", " << w << ", " << h << ", " << c << ", " << k << ", " << 
-                                fdim << ", " << benchTime.avgTime << ", " << benchTime.maxTime << std::endl;
-                        std::cout << ss.str();
-                    }
+    ss << "Kernel:" << std::endl;
+    // Filter tensor ordering is KCHW
+    // See: https://devtalk.nvidia.com/default/topic/774597/?comment=4309844
+    for (int idx_k = 0;idx_k < filter_k; idx_k++) {
+        ss << "k=" << idx_k+1 << std::endl;
+        value_type temp[filter_dim*filter_dim] = {0};
+        // Change only the center of filter
+        if (idx_k == 0) {
+            temp[4] = 5;
+        } else {
+            temp[4] = 1;
+        }
+        for (int idx_c = 0;idx_c < filter_c; idx_c++) {
+            ss << "  c=" << idx_c+1 << std::endl;
+            for (int idx_h = 0;idx_h < filter_dim;idx_h++) {
+                for (int idx_w = 0 ;idx_w < filter_dim;idx_w++) {
+                    int idx = idx_k * filter_c * filter_dim * filter_dim +
+                            idx_c * filter_dim * filter_dim +
+                            idx_h * filter_dim + 
+                            idx_w;
+                    data_h[idx] = temp[idx_h*filter_dim +idx_w];
+                    ss << data_h[idx] << " ";
                 }
-           }
+                ss << std::endl;
+            }
         }
     }
 
-    ss.str("");
-    ss << "Total time taken=" << total << " us." << std::endl;
     std::cout << ss.str() << std::endl;
+    value_type* data_d;
+    checkCudaErrors( cudaMalloc(&data_d, filter_size*sizeof(value_type)) );
+    checkCudaErrors( cudaMemcpy(data_d, data_h, filter_size*sizeof(value_type), cudaMemcpyHostToDevice));
+
+
+    // ------ Begin bias initialization --------------
+    float bias_h[filter_k] = { 2, 1 };
+    ss.str("");
+    ss << "Bias:" << std::endl;
+    for (int idx_k = 0 ; idx_k < filter_k ; idx_k++) {
+        ss << "k=" << idx_k+1 << std::endl;
+        ss << bias_h[idx_k] << std::endl;
+    }
+    std::cout << ss.str() << std::endl;
+    value_type* bias_d;
+    checkCudaErrors( cudaMalloc(&bias_d, filter_k*sizeof(value_type)) );
+    checkCudaErrors( cudaMemcpy(bias_d, bias_h, filter_k*sizeof(value_type), cudaMemcpyHostToDevice));
+
+
+    // ------ Begin layer creation --------------
+    ss.str("");
+    ss << "Creating layer with c=" << filter_c << " k=" << filter_k
+            << " filter_dim=" << filter_dim << std::endl;
+    std::cout << ss.str() << std::endl;
+    Layer l = Layer(filter_c, filter_k, filter_dim, data_h, data_d, bias_h, bias_d);
+
+
+    Network network;
+    // ------ Begin image initialization --------------
+    ss.str("");
+    ss << "Image:\n";
+    int n = 2, c = filter_c;
+    int h = 10;
+    int w = 10;
+    int image_size = n*c*h*w;
+    value_type srcData_h[image_size];
+    // Image of all 1s
+    for (int n_idx = 0 ; n_idx < n ; n_idx++) {
+        ss << "n=" << n_idx +1 << std::endl;
+        for (int c_idx = 0 ; c_idx < c ; c_idx++) {
+            ss << "c=" << c_idx+1 << std::endl;
+            for (int h_idx = 0 ; h_idx < h ; h_idx++) {
+                for (int w_idx = 0 ; w_idx < w ; w_idx++) {
+                    int idx = n_idx*c*h*w + c_idx*h*w + h_idx*w + w_idx;
+                    if (n_idx == 0) {
+                        if (c_idx == 0) {
+                            srcData_h[idx] = idx;
+                        } else {
+                            srcData_h[idx] = 2;
+                        }
+                    } else {
+                        srcData_h[idx] = 3;
+                    }
+                    ss << srcData_h[idx] << " ";
+                }
+                ss << std::endl;
+            }
+        }
+    }
+    value_type *srcData;
+    checkCudaErrors( cudaMalloc(&srcData, image_size*sizeof(value_type)) );
+    checkCudaErrors( cudaMemcpy(srcData, srcData_h, image_size*sizeof(value_type), cudaMemcpyHostToDevice) );
+    std::cout << ss.str() << std::endl;
+
+    // -------- Begin convolution ---------------
+    value_type *dstData = NULL;
+    ss.str("");
+    ss << "Before calling convolute n=" << n << " c=" << c << " h=" << h << " w=" << w << std::endl;
+    std::cout << ss.str();
+    // The first two params are number of image(s) and number of
+    // feature maps per image
+    ConvDimen inDimen = { n, c, h, w };
+    ConvDimen outDimen = network.getConvDimension(l, inDimen);
+    ConvAlgo convAlgo = network.getConvAlgo(l, inDimen, outDimen);
+    int workspaceSize_b = convAlgo.workspaceSize_b;
+    value_type *workspace = NULL;
+    checkCudaErrors(cudaMalloc(&workspace, convAlgo.workspaceSize_b));
+
+
+    int resultSize = sizeof(value_type) * outDimen.n * outDimen.c * outDimen.h * outDimen.w;
+    int resultSize_b = resultSize * sizeof(value_type);
+    checkCudaErrors(cudaMalloc(&dstData, resultSize_b));
+    network.convoluteForward(l, inDimen, outDimen, srcData, dstData, convAlgo, workspace);
+    ss.str("");
+    n = outDimen.n;
+    c = outDimen.c;
+    h = outDimen.h;
+    w = outDimen.w;
+    ss << "After calling convolute n=" << n << " c=" << c << " h=" << h << " w=" << w << std::endl;
+    ss << std::endl;
+    std::cout << ss.str();
+
+    value_type result[resultSize];
+    ss.str("");
+    checkCudaErrors( cudaMemcpy(result, dstData, resultSize_b, cudaMemcpyDeviceToHost) );
+    for (int n_idx = 0 ; n_idx < n ; n_idx++) {
+        ss << "n=" << n_idx + 1 << std::endl;
+        for (int c_idx = 0 ; c_idx < c ; c_idx++) {
+            ss << "  c=" << c_idx + 1<< std::endl;
+            for (int h_idx = 0 ; h_idx < h ; h_idx++) {
+                for (int w_idx = 0 ; w_idx < w ; w_idx++) {
+                    int idx = n_idx * c * h * w + 
+                            c_idx * h * w +
+                            h_idx * w +
+                            w_idx;
+                    ss << result[idx] << " ";
+                }
+                ss << std::endl;
+            }
+            ss << std::endl;
+        }
+    }
+
+    std::cout << "After convolution:\n" << ss.str();
 }
+
+
+
 
 value_type *mImg = NULL;
 string IMG_PATH = "/data/cudnn/lena_4k.pgm";
@@ -181,23 +208,93 @@ const int IMG_HEIGHT = 2160;
 
 
 int loadImage(const string &path);
-int saveImage(const value_type *img, const string &path);
-
 int loadImage(const string &path) {
     if (mImg == NULL) {
         mImg = new value_type[sizeof(value_type) * IMG_WIDTH * IMG_HEIGHT];
     }
-
-    int ret = loadPGMImageFile(path.c_str(), IMG_WIDTH, IMG_HEIGHT, mImg);
-    cout << endl;
-    for (int i = 0 ; i < 30 ; i++) {
-        cout << mImg[i] << endl;
-    }
-
-    return ret;
+         
+    return loadPGMImageFile(path.c_str(), IMG_WIDTH, IMG_HEIGHT, mImg);
 }
 
-int saveImage(const value_type *img, const string &path) {
+CNNResult loadLayerParams();
+CNNResult loadLayerParams() {
+    int c = 1;
+    int k = 1;
+    int dim = 3;
+    int fsize = c * k * dim * dim;
+    int fsize_b = fsize * sizeof(value_type);
+    value_type *data_h = new value_type[fsize];
+    value_type *data_d;
+    for (int idx_k = 0 ; idx_k < k ; idx_k++) {
+        for (int idx_c = 0 ; idx_c < c ; idx_c++) {
+            for (int idx_dim_y = 0 ; idx_dim_y < dim ; idx_dim_y++) {
+                for (int idx_dim_x = 0 ; idx_dim_x < dim ; idx_dim_x++) {
+                    int idx = idx_k * c * dim * dim + 
+                            idx_c * dim * dim +
+                            idx_dim_y * dim + 
+                            idx_dim_x;
+
+                    if (idx_dim_x == 1 && idx_dim_y == 1) {
+                        data_h[idx] = 1.5;
+                    } else {
+                        data_h[idx] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = 0 ; i < fsize ; i++) {
+        cout << "i=" << i << " " << data_h[i] << endl;
+    }
+
+    int bsize = k;
+    int bsize_b = bsize * sizeof(value_type);
+    value_type *bias_h = new value_type[bsize];
+    value_type *bias_d;
+
+    checkCudaErrors(cudaMalloc(&data_d, fsize_b));
+    checkCudaErrors(cudaMemcpy(data_d, data_h, fsize_b, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMalloc(&bias_d, bsize_b));
+    Layer layer = Layer(c, k, dim, data_h, data_d, bias_h, bias_d);
+
+    Network network;
+    int n = 1;
+    ConvDimen inDimen = { n, c, IMG_HEIGHT, IMG_WIDTH };
+    ConvDimen outDimen = network.getConvDimension(layer, inDimen);
+
+    cout << "After convolution n=" << outDimen.n << " c=" << outDimen.c << " h=" <<
+            outDimen.h << " w=" << outDimen.w << endl;
+
+    value_type *img_data_d;
+    int isize_b = IMG_WIDTH * IMG_HEIGHT * sizeof(value_type);
+    checkCudaErrors(cudaMalloc(&img_data_d, isize_b));
+    checkCudaErrors(cudaMemcpy(img_data_d, mImg, isize_b, cudaMemcpyHostToDevice));
+
+    value_type *dstData;
+    int dstsize_b = outDimen.w * outDimen.h * sizeof(value_type);
+    checkCudaErrors(cudaMalloc(&dstData, dstsize_b));
+
+    ConvAlgo convAlgo = network.getConvAlgo(layer, inDimen, outDimen);
+    int workspaceSize_b = convAlgo.workspaceSize_b;
+    value_type *workspace = NULL;
+    checkCudaErrors(cudaMalloc(&workspace, convAlgo.workspaceSize_b));
+
+    long time = getCurrentTime();
+    network.convoluteForward(layer, inDimen, outDimen, img_data_d, dstData, convAlgo, workspace);
+    cout << "Convolution takes " << (getCurrentTime() - time) << "us." << endl;
+
+    checkCudaErrors(cudaThreadSynchronize());
+    memset(mImg, 0, IMG_WIDTH * IMG_HEIGHT * sizeof(value_type));
+    checkCudaErrors(cudaMemcpy(mImg, dstData, dstsize_b, cudaMemcpyDeviceToHost));
+
+    CNNResult result = { outDimen.h, outDimen.w, mImg };
+
+    return result;
+}
+
+int saveImage(const value_type *img, const int height, const int width, const string &path);
+int saveImage(const value_type *img, const int height, const int width, const string &path) {
     ofstream out;
     out.open(path.c_str(), ios::out | ios::binary | ios::trunc);
 
@@ -205,18 +302,18 @@ int saveImage(const value_type *img, const string &path) {
         // print out header
         out << "P5" << endl;
         out << "# CREATOR: GIMP PNM Filter Version 1.1" << endl;
-        out << IMG_WIDTH << " " << IMG_HEIGHT << endl;
+        out << width << " " << height << endl;
         out << 255 << endl;
 
         stringstream ss;
-        char img_b[IMG_HEIGHT][IMG_WIDTH];
-        for (int y = 0 ; y < IMG_HEIGHT ; y++) {
-            for (int x = 0 ; x < IMG_WIDTH ; x++) {
-                int val = img[y * IMG_WIDTH + x] * 255.0f;
+        char img_b[height][width];
+        for (int y = 0 ; y < height ; y++) {
+            for (int x = 0 ; x < width ; x++) {
+                int val = img[y * width + x] * 255.0f;
                 //ss << img[y * IMG_WIDTH + x] << endl;
                 img_b[y][x] = (val > 255 ? 255 : val);
             }
-            out.write(reinterpret_cast<const char*>(img_b[y]), IMG_WIDTH);
+            out.write(reinterpret_cast<const char*>(img_b[y]), width);
         }
 
         out.close();
@@ -225,8 +322,8 @@ int saveImage(const value_type *img, const string &path) {
     return -1;
 }
 
-int main(int argc, char** argv) {
-    //executeBenchmark();
+int doExecution();
+int doExecution() {
     long time = getCurrentTime();
     if (loadImage(IMG_PATH)) {
         std::cout << "Can't load image=" << IMG_PATH << std::endl;
@@ -237,10 +334,11 @@ int main(int argc, char** argv) {
     ss << "Image=" << IMG_PATH << " is loaded in " << (getCurrentTime() - time) / 1e3f << "ms." << endl;
     cout << ss.str();
 
+    CNNResult res = loadLayerParams();
 
     time = getCurrentTime();
     string outImgPath = IMG_OUT_PATH;
-    if (saveImage(mImg, outImgPath)) {
+    if (saveImage(res.result, res.h, res.w,  outImgPath)) {
         cout << "Can't save image=" << outImgPath << endl;
         return -1;
     }
@@ -249,5 +347,12 @@ int main(int argc, char** argv) {
     ss << "Image=" << outImgPath << " is saved in " << (getCurrentTime() - time) / 1e3f << "ms." << endl;
     cout << ss.str();
 
+    return 0;
+}
+
+int main(int argc, char** argv) {
+    //executeBenchmark();
+    doExecution();
+    //debug();
     return 0;
 }

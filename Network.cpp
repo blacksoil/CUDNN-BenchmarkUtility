@@ -281,7 +281,7 @@ void Network::convoluteForward(const Layer& conv,
                                                 1,1, // stride
                                                 1,1, // upscale
                                                 // TODO? CUDNN_CROSS_CORRELATION or CUDNN_CONVOLUTION?
-                                                CUDNN_CONVOLUTION) );
+                                                CUDNN_CROSS_CORRELATION) );
 
     checkCUDNN( cudnnSetTensor4dDescriptor(mDstTensorDesc,
                                             mTensorFormat,

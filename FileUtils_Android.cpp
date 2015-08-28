@@ -69,6 +69,7 @@ int readBinaryFile(const char* fname, int size, value_type** data_h, value_type*
     int size_b = size*sizeof(value_type);
     *data_h = new value_type[size];
     if (!dataFile.read ((char*) *data_h, size_b)) {
+        dataFile.close();
         return -1;
     }
 
@@ -76,5 +77,7 @@ int readBinaryFile(const char* fname, int size, value_type** data_h, value_type*
     checkCudaErrors( cudaMemcpy(*data_d, *data_h,
                                 size_b,
                                 cudaMemcpyHostToDevice) );
+    dataFile.close();
     return 0;
 }
+
