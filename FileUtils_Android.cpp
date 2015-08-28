@@ -48,11 +48,11 @@ int loadPGMImageFile(const char* fname, int width, int height, value_type *resul
         return -1;
     }
 
+    int cnt = 0;
     // Normalize and store this to a file
-    for (int i = 0 ; i < width ; i++) {
-        for (int j = 0 ; j < height ; j++) {
-            result[i*width + j] = (*img_data++) / 255;
-            // std::cout << result[i*width+j];
+    for (int j = 0 ; j < height ; j++) {
+        for (int i = 0 ; i < width ; i++) {
+            result[j*width + i] = (*img_data++) / 255.0f;
         }
         // std::cout << std::endl;
     }

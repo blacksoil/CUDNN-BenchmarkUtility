@@ -5,9 +5,14 @@
 //       what OS is compiling this program.
 #include "FileUtils.h"
 
+
+#include <string>
+#include <fstream>
 #include <iostream>
 
 #define value_type float
+
+using namespace std;
 
 long getCurrentTime();
 void executeBenchmark();
@@ -164,7 +169,85 @@ void executeBenchmark() {
     std::cout << ss.str() << std::endl;
 }
 
+value_type *mImg = NULL;
+string IMG_PATH = "/data/cudnn/lena_4k.pgm";
+//string IMG_PATH = "/data/cudnn/lena_20.pgm";
+string IMG_OUT_PATH = "/data/cudnn/lena_4k_out.pgm";
+//string IMG_OUT_PATH = "/data/cudnn/lena_20_out.pgm";
+const int IMG_WIDTH = 3840;
+const int IMG_HEIGHT = 2160;
+//const int IMG_WIDTH = 36;
+//const int IMG_HEIGHT = 20;
+
+
+int loadImage(const string &path);
+int saveImage(const value_type *img, const string &path);
+
+int loadImage(const string &path) {
+    if (mImg == NULL) {
+        mImg = new value_type[sizeof(value_type) * IMG_WIDTH * IMG_HEIGHT];
+    }
+
+    int ret = loadPGMImageFile(path.c_str(), IMG_WIDTH, IMG_HEIGHT, mImg);
+    cout << endl;
+    for (int i = 0 ; i < 30 ; i++) {
+        cout << mImg[i] << endl;
+    }
+
+    return ret;
+}
+
+int saveImage(const value_type *img, const string &path) {
+    ofstream out;
+    out.open(path.c_str(), ios::out | ios::binary | ios::trunc);
+
+    if (out.is_open()) {
+        // print out header
+        out << "P5" << endl;
+        out << "# CREATOR: GIMP PNM Filter Version 1.1" << endl;
+        out << IMG_WIDTH << " " << IMG_HEIGHT << endl;
+        out << 255 << endl;
+
+        stringstream ss;
+        char img_b[IMG_HEIGHT][IMG_WIDTH];
+        for (int y = 0 ; y < IMG_HEIGHT ; y++) {
+            for (int x = 0 ; x < IMG_WIDTH ; x++) {
+                int val = img[y * IMG_WIDTH + x] * 255.0f;
+                //ss << img[y * IMG_WIDTH + x] << endl;
+                img_b[y][x] = (val > 255 ? 255 : val);
+            }
+            out.write(reinterpret_cast<const char*>(img_b[y]), IMG_WIDTH);
+        }
+
+        out.close();
+        return 0;
+    }
+    return -1;
+}
+
 int main(int argc, char** argv) {
-    executeBenchmark();
+    //executeBenchmark();
+    long time = getCurrentTime();
+    if (loadImage(IMG_PATH)) {
+        std::cout << "Can't load image=" << IMG_PATH << std::endl;
+        return -1;
+    }
+
+    stringstream ss;
+    ss << "Image=" << IMG_PATH << " is loaded in " << (getCurrentTime() - time) / 1e3f << "ms." << endl;
+    cout << ss.str();
+
+
+    time = getCurrentTime();
+    string outImgPath = IMG_OUT_PATH;
+    if (saveImage(mImg, outImgPath)) {
+        cout << "Can't save image=" << outImgPath << endl;
+        return -1;
+    }
+
+    ss.str("");
+    ss << "Image=" << outImgPath << " is saved in " << (getCurrentTime() - time) / 1e3f << "ms." << endl;
+    cout << ss.str();
+
     return 0;
 }
