@@ -66,6 +66,20 @@ struct ConvDimen
     int c;
     int h;
     int w;
+
+    ConvDimen(){}
+    ConvDimen(const ConvDimen &other) {
+        n = other.n;
+        c = other.c;
+        h = other.h;
+        w = other.w;
+    }
+    ConvDimen(int _n, int _c, int _h, int _w) {
+        n = _n;
+        c = _c;
+        h = _h;
+        w = _w;
+    }
 };
 
 struct ConvAlgo
@@ -103,6 +117,9 @@ class Network
                           const ConvDimen &inDimen, const ConvDimen &outDimen,
                           value_type* srcData, value_type* dstData,
                           const ConvAlgo &convAlgo, value_type* workspace);
+    void activateForward(const ConvDimen inDimen,
+                         value_type* srcData, value_type** dstData);
+
 };
 
 

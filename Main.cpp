@@ -71,7 +71,7 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
     int dstDataSize_b;
     int workspaceSize_b;
 
-    ConvDimen inDimen = { img_n, img_filter_c, img_h, img_w };
+    ConvDimen inDimen(img_n, img_filter_c, img_h, img_w);
     ConvDimen outDimen = network.getConvDimension(layer, inDimen);
     ConvAlgo convAlgo = network.getConvAlgo(layer, inDimen, outDimen);
 
@@ -88,6 +88,7 @@ BenchTime benchmark(int img_w, int img_h, int img_n, int img_filter_c, int filte
         checkCudaErrors(cudaMemcpy(img_data_d, img_data_h, img_size_b, cudaMemcpyHostToDevice));
         timeTaken = getCurrentTime();
         network.convoluteForward(layer, inDimen, outDimen, img_data_d, dstData, convAlgo, workspace);
+        checkCudaErrors(cudaDeviceSynchronize());
         deltaTime = getCurrentTime() - timeTaken;
         totalTime += deltaTime;
         maxTime = std::max(maxTime, deltaTime);

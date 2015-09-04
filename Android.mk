@@ -3,7 +3,7 @@ LOCAL_PATH := $(call my-dir)
 include $(NVIDIA_DEFAULTS)
 
 LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE := cudnn-mnist
+LOCAL_MODULE := cudnn
 LOCAL_MULTILIB := 64
 
 LOCAL_SRC_FILES := FileUtils_Android.cpp  Main.cpp  Network.cpp

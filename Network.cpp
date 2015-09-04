@@ -71,8 +71,8 @@ Layer::Layer(int _inputs, int _outputs, int _kernel_dim,
     }
     */
 
-    checkCudaErrors( cudaMemcpy(bias_d, bias_h, outputs*sizeof(value_type),
-                                cudaMemcpyHostToDevice) );
+    //checkCudaErrors( cudaMemcpy(bias_d, bias_h, outputs*sizeof(value_type),
+    //                            cudaMemcpyHostToDevice) );
 }
 
 Layer::~Layer()
@@ -281,7 +281,7 @@ void Network::convoluteForward(const Layer& conv,
                                                 1,1, // stride
                                                 1,1, // upscale
                                                 // TODO? CUDNN_CROSS_CORRELATION or CUDNN_CONVOLUTION?
-                                                CUDNN_CONVOLUTION) );
+                                                CUDNN_CROSS_CORRELATION) );
 
     checkCUDNN( cudnnSetTensor4dDescriptor(mDstTensorDesc,
                                             mTensorFormat,
@@ -304,4 +304,37 @@ void Network::convoluteForward(const Layer& conv,
                                           &beta,
                                           mDstTensorDesc,
                                           dstData) );
+    addBias(mDstTensorDesc, conv, outDimen.c, dstData);
+}
+
+void Network::activateForward(const ConvDimen inDimen,
+    value_type* srcData, value_type** dstData)
+{
+    int n = inDimen.n;
+    int c = inDimen.c;
+    int h = inDimen.h;
+    int w = inDimen.w;
+
+    checkCUDNN( cudnnSetTensor4dDescriptor(mSrcTensorDesc,
+                                            mTensorFormat,
+                                            mDataType,
+                                            n, c,
+                                            h,
+                                            w) );
+    checkCUDNN( cudnnSetTensor4dDescriptor(mDstTensorDesc,
+                                            mTensorFormat,
+                                            mDataType,
+                                            n, c,
+                                            h,
+                                            w) );
+    value_type alpha = value_type(1);
+    value_type beta  = value_type(0);
+    checkCUDNN( cudnnActivationForward(mCudnnHandle,
+                                        CUDNN_ACTIVATION_RELU,
+                                        &alpha,
+                                        mSrcTensorDesc,
+                                        srcData,
+                                        &beta,
+                                        mDstTensorDesc,
+                                        *dstData) );
 }
